@@ -7,8 +7,8 @@ setwd("/Users/lucydelaney/220bb-calculator/")
 
 
 ### IMPORT GRADE FILE ###
-blackboard.raw <- read_csv("R/all-grades-prefinal.csv", col_names = T, na = c("", " ", "NA"), 
-         trim_ws = T, skip_empty_rows = T) 
+blackboard.raw <- read_csv("R/all-class-grades-prefinal.csv", col_names = T, na = c("", " ", "NA"), 
+         trim_ws = T, skip_empty_rows = T, n_max = 16) 
 
 
 ### PRUNE UGLY GRADE FILE ###
@@ -77,8 +77,7 @@ edit.raw.grades <- function(mydata = blackboard.raw){
     select(bonus = "Bonus Evals First Half [Total Pts: 0 Score] |1758308")
   
   ## Combine all columns for final grade calculations for specific TA
-  final <- bind_cols(names, Quiz.total, new.hw, exams, iClick, bonus) %>%
-    filter(ta == "Kirk")
+  final <- bind_cols(names, Quiz.total, new.hw, exams, iClick, bonus) #%>% filter(ta == "Kirk")
   
   return(final)
   
@@ -99,24 +98,37 @@ make.grades <- function(prunedgrades = prune.grades){
     #Right now, 10 quizzes, 2 exams, 7HWs, and 25 iClick (bonus is bonus)
   total.so.far <- (10 * 10) + (2 * 100) + (7*10) + 25
   
+  ## List of students' names and TA
   name <- prunedgrades %>%
-    select(name)
+    select(name, ta)
   
-  ##ADD HERE: IF NA ON AN EXAM, SUBTRACT 100 FROM STUDENT TOTALS
+  ## Pull out students that were exempted for one of the exams
+  exam.exemptions <- prunedgrades %>%
+    filter(is.na(Exam.1) | is.na(Exam.2)) %>%
+    mutate(total.points = total.so.far - 100) %>%
+    select(name, ta, total.points)
   
-  ## Select quiz totals, HW totals, exam totals, iClicker totals, and bonus
-    #Sum and divide by total points so far for percentage
-  final.calculations <- prunedgrades %>%
-    select(Quiz.total, HW.totals, Exam.1:bonus) %>%
-    mutate(total = rowSums(., na.rm = T), total.points = total.so.far,
-           perc = (total/total.points)*100) %>%
-    bind_cols(name, .) %>%
-    select(-total.points) %>%
+  ## Add back to full df and fix total course points so you may divide
+  ## and calculate percentage for each student
+  fix.for.calculations <- prunedgrades %>%
+    select(name, ta, Quiz.total, HW.totals, Exam.1:bonus) %>%
+    mutate(total.points = total.so.far) %>%
+    left_join(exam.exemptions, by = c("name", "ta")) %>%
+    mutate(totalpts = case_when(!is.na(total.points.y) ~ total.points.y, is.na(total.points.y) ~ total.points.x)) %>%
+    select(name, ta, Quiz.total:bonus, totalpts)
+  
+  ## Use percentage to assign letter grades
+  adding.data <- fix.for.calculations %>%
+    select(Quiz.total:bonus) %>%
+    mutate(total = rowSums(., na.rm = T)) %>%
+    left_join(fix.for.calculations) %>%
+    mutate(perc = (total/totalpts)*100) %>%
+    select(name, ta, total, perc) %>%
     mutate(grade = case_when(perc < 50.5 ~ "F", (50.5 <= perc & perc < 59.5) ~ "D", 
-                             (59.5 <= perc & perc < 74) ~ "C", (74.5 <= perc & perc < 84.5) ~ "B", 
+                             (59.5 <= perc & perc < 74.5) ~ "C", (74.5 <= perc & perc < 84.5) ~ "B", 
                              (84.5 <= perc & perc <= 100) ~ "A"))
   
-  return(final.calculations)
+  return(adding.data)
   
 }
 
@@ -133,7 +145,7 @@ my.grades <- grade.summary %>%
 
 ### WHAT DO I NEED ON THE FINAL? ###
 
-move.up.grade <- function(mydata=my.grades){
+move.up.grade <- function(mydata=grade.summary){
   
   ## Edit here the class totals so far
   #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker

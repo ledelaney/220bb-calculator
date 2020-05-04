@@ -105,21 +105,33 @@ make.grades <- function(prunedgrades = prune.grades){
   name <- prunedgrades %>%
     select(name, ta)
   
-  ##ADD HERE: IF NA ON AN EXAM, SUBTRACT 100 FROM STUDENT TOTALS
+  ## Pull out students that were exempted for one of the exams
+  exam.exemptions <- prunedgrades %>%
+    filter(is.na(Exam.1) | is.na(Exam.2)) %>%
+    mutate(total.points = total.so.far - 100) %>%
+    select(name, ta, total.points)
   
-  ## Select quiz totals, HW totals, exam totals, iClicker totals, and bonus
-    #Sum and divide by total points so far for percentage
-  final.calculations <- prunedgrades %>%
-    select(Quiz.total, HW.totals, Exam.1:bonus) %>%
-    mutate(total = rowSums(., na.rm = T), total.points = total.so.far,
-           perc = (total/total.points)*100) %>%
-    bind_cols(name, .) %>%
-    select(-total.points) %>%
+  ## Add back to full df and fix total course points so you may divide
+  ## and calculate percentage for each student
+  fix.for.calculations <- prunedgrades %>%
+    select(name, ta, Quiz.total, HW.totals, Exam.1:bonus) %>%
+    mutate(total.points = total.so.far) %>%
+    left_join(exam.exemptions, by = c("name", "ta")) %>%
+    mutate(totalpts = case_when(!is.na(total.points.y) ~ total.points.y, is.na(total.points.y) ~ total.points.x)) %>%
+    select(name, ta, Quiz.total:bonus, totalpts)
+  
+  ## Use percentage to assign letter grades
+  adding.data <- fix.for.calculations %>%
+    select(Quiz.total:bonus) %>%
+    mutate(total = rowSums(., na.rm = T)) %>%
+    left_join(fix.for.calculations) %>%
+    mutate(perc = (total/totalpts)*100) %>%
+    select(name, ta, total, perc) %>%
     mutate(grade = case_when(perc < 50.5 ~ "F", (50.5 <= perc & perc < 59.5) ~ "D", 
                              (59.5 <= perc & perc < 74.5) ~ "C", (74.5 <= perc & perc < 84.5) ~ "B", 
                              (84.5 <= perc & perc <= 100) ~ "A"))
   
-  return(final.calculations)
+  return(adding.data)
   
 }
 
