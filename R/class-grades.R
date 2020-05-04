@@ -36,8 +36,6 @@ edit.raw.grades <- function(mydata = blackboard.raw){
   Quiz.total <- tibble(rowSums(quiz)) %>%
     setNames(., "Quiz.total") %>%
     bind_cols(quiz, .)
-    #mutate(Qsum = rowSums(., na.rm = T)) %>%
-    #mutate(Qavg = rowMeans(., na.rm = T)) 
   
   ## Rename HW rows, replace NA with average
   hw <- mydata %>%
