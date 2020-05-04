@@ -1,0 +1,53 @@
+---
+title: "Final Grades"
+output: 
+  html_document:
+    highlight: tango
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+
+setwd("/Users/lucydelaney/220bb-calculator/")
+
+## Import relevant data
+source("R/final-course-grades.R")
+
+```
+
+
+
+```{r, eval=TRUE, warning = FALSE}
+
+## Make a color-labeled grade table
+final.grades %>%
+   mutate(TotalPerc = case_when(TotalPerc < 50.5 ~ cell_spec(TotalPerc, color = "white", 
+                                                             background = viridis(n = 1, begin = 0, end = 0.2)), 
+                            (50.5 <= TotalPerc & TotalPerc < 59.5) ~ cell_spec(TotalPerc, 
+                            color = "white", 
+                            background = viridis(n = 1, begin = 0.2, end = 0.4)), 
+                             (59.5 <= TotalPerc & TotalPerc < 74.5) ~ cell_spec(TotalPerc, color = "white",
+                                                                  background = viridis(n = 1, 
+                                                                              begin = 0.4, end = 0.6)), 
+                             (74.5 <= TotalPerc & TotalPerc < 84.5) ~ cell_spec(TotalPerc, color = "white",
+                                                          background = viridis(n = 1, begin = 0.6, end = 0.8)),
+                             (84.5 <= TotalPerc & TotalPerc <= 100) ~ cell_spec(TotalPerc, color = "white",
+                                                      background = viridis(n = 1, begin = 0.8, end = 1)))) %>%
+  mutate(NewCourseGrade = case_when(NewCourseGrade == "A" ~ cell_spec(NewCourseGrade, color = "white",
+                                                      background = viridis(n = 1, begin = 0.8, end = 1)), 
+                           NewCourseGrade == "B" ~ cell_spec(NewCourseGrade, color = "white",
+                                                          background = viridis(n = 1, begin = 0.6, end = 0.8)),
+                           NewCourseGrade == "C" ~ cell_spec(NewCourseGrade, color = "white",
+                                                          background = viridis(n = 1, begin = 0.4, end = 0.6)),
+                           NewCourseGrade == "D" ~ cell_spec(NewCourseGrade, color = "white",
+                                                          background = viridis(n = 1, begin = 0.2, end = 0.4)),
+                           NewCourseGrade == "F" ~ cell_spec(NewCourseGrade, color = "white",
+                                                          background = viridis(n = 1, begin = 0, end = 0.2)))) %>%
+  mutate(Redemption = ifelse(Redemption == "Redeemed",
+                  cell_spec(Redemption, color = "red", bold = T),
+                  cell_spec(Redemption, italic = T))) %>%
+  kable(escape = F, align = "c") %>%
+  kable_styling(c("striped", "condensed"), full_width = F) 
+
+```
