@@ -147,11 +147,16 @@ my.grades <- grade.summary %>%
 ## Download a csv sorted by TA of all relevant grading columns
 write_csv(x = my.grades, path = "R/my-gradesheet.csv")
 
+final.grades <- my.grades %>%
+  select(name:grade, Final.A, Final.B) %>%
+  mutate(FinalExamPerc = Final.A + Final.B) %>%
+  select(-Final.A, -Final.B)
 
 ## Add a fake final exam score to test dummy table, fix names, 
 ## assign final exam letter grades
 dummy.grades <- grade.summary %>%
   add_column(runif(n = length(grade.summary$total), min = 40, max = 85)) %>%
+  ## Here you will add do assign.grades <- final.grades %>%
   setNames(., c("Name", "TA", "TotalPts", "TotalPerc", "Grade", "FinExamPerc")) %>%
   mutate(FinExamGrade = case_when(FinExamPerc < 50.5 ~ "F", 
                                   (50.5 <= FinExamPerc & FinExamPerc < 59.5) ~ "D", 
