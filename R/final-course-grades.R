@@ -182,6 +182,6 @@ final.grades <- assign.grades %>% # here change to assign.grades
   arrange(Redemption, desc(TotalPerc), Name) %>%
   filter(!is.na(TA))
 
-#write_csv(final.grades, "R/final-grades.csv")
+write_csv(final.grades, "R/final-grades.csv")
 
 
