@@ -10,7 +10,7 @@ setwd("/Users/lucydelaney/220bb-calculator/")
 
 
 ### IMPORT GRADE FILE ###
-blackboard.raw <- read_csv("R/all-class-grades-prefinal.csv", col_names = T, na = c("", " ", "NA"), 
+blackboard.raw <- read_csv("R/all-class-grades-postfinal.csv", col_names = T, na = c("", " ", "NA"), 
                    trim_ws = T, skip_empty_rows = T, n_max = 16) 
 
 
@@ -66,7 +66,9 @@ edit.raw.grades <- function(mydata = blackboard.raw){
     select(Exam.1 = "Exam 1 [Total Pts: 100 Score] |1720428", 
            Exam.2 = "EXAM 2 [Total Pts: 100 Score] |1802569", 
            Final.A = "Final Exam Part A [Total Pts: 100 Score] |1808678", 
-           Final.B = "BIOS220 FINAL Part B [Total Pts: 100 Score] |1807167")
+           Final.B = "BIOS220 FINAL Part B [Total Pts: 100 Score] |1807167") %>%
+    rowwise() %>%
+    mutate(Exam.total = sum(Exam.1, Exam.2, na.rm = T), FinExam.Total = sum(Final.A, Final.B, na.rm = T))
   
   ## Select and rename iClicker scores
   iClick <- mydata %>%
@@ -99,7 +101,7 @@ make.grades <- function(prunedgrades = prune.grades){
   ## Edit here the class totals so far
     #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker
     #Right now, 10 quizzes, 2 exams, 7HWs, and 25 iClick (bonus is bonus)
-  total.so.far <- (10 * 10) + (2 * 100) + (7*10) + 25
+  total.so.far <- (10 * 10) + (2 * 200) + (7*10) + 25
   
   ## List of students' names and TA
   name <- prunedgrades %>%
@@ -114,11 +116,11 @@ make.grades <- function(prunedgrades = prune.grades){
   ## Add back to full df and fix total course points so you may divide
   ## and calculate percentage for each student
   fix.for.calculations <- prunedgrades %>%
-    select(name, ta, Quiz.total, HW.totals, Exam.1:bonus) %>%
+    select(name, ta, Quiz.total, HW.totals, Exam.total:bonus) %>%
     mutate(total.points = total.so.far) %>%
     left_join(exam.exemptions, by = c("name", "ta")) %>%
     mutate(totalpts = case_when(!is.na(total.points.y) ~ total.points.y, is.na(total.points.y) ~ total.points.x)) %>%
-    select(name, ta, Quiz.total:bonus, totalpts)
+    select(name, ta, Quiz.total:bonus, totalpts) 
   
   ## Use percentage to assign letter grades
   adding.data <- fix.for.calculations %>%
@@ -147,23 +149,23 @@ my.grades <- grade.summary %>%
 ## Download a csv sorted by TA of all relevant grading columns
 write_csv(x = my.grades, path = "R/my-gradesheet.csv")
 
-final.grades <- my.grades %>%
+add.grades <- my.grades %>%
   select(name:grade, Final.A, Final.B) %>%
-  mutate(FinalExamPerc = Final.A + Final.B) %>%
+  mutate(FinalExamPerc = Final.A + Final.B/200) %>%
   select(-Final.A, -Final.B)
 
 ## Add a fake final exam score to test dummy table, fix names, 
 ## assign final exam letter grades
 dummy.grades <- grade.summary %>%
   add_column(runif(n = length(grade.summary$total), min = 40, max = 85)) %>%
-  ## Here you will add do assign.grades <- final.grades %>%
+  ## Here you will add do assign.grades <- add.grades %>%
   setNames(., c("Name", "TA", "TotalPts", "TotalPerc", "Grade", "FinExamPerc")) %>%
   mutate(FinExamGrade = case_when(FinExamPerc < 50.5 ~ "F", 
                                   (50.5 <= FinExamPerc & FinExamPerc < 59.5) ~ "D", 
                                   (59.5 <= FinExamPerc & FinExamPerc < 74.5) ~ "C", 
                                   (74.5 <= FinExamPerc & FinExamPerc < 84.5) ~ "B",
                                   (84.5 <= FinExamPerc & FinExamPerc <= 100) ~ "A")) %>%
-  mutate(Redemption = ifelse(FinExamPerc > TotalPerc, yes = "Redeemed?", no = "Unredeemed")) %>%
+  mutate(Redemption = ifelse(FinExamPerc > TotalPerc, yes = "Redeemed?", no = "Upheld")) %>%
   mutate(Name, Grade, TotalPerc = round(TotalPerc, 2), Redemption, FinExamPerc = round(FinExamPerc, 2), 
          FinExamGrade, TA) %>%
   select(-TotalPts)
@@ -171,13 +173,17 @@ dummy.grades <- grade.summary %>%
 ## If final exam percentage is higher than course grade percentage, and the grade is not the same,
 ## give final exam grade -- "Redeemed"
   #df for use with RMD file "grade-totals"
-final.grades <- dummy.grades %>%
+
+final.grades <- dummy.grades %>% # here change to assign.grades
   filter(Redemption == "Redeemed?") %>%
-  mutate(Redemption = ifelse(FinExamGrade==Grade, yes = "Unredeemed", no = "Redeemed")) %>%
+  mutate(Redemption = ifelse(FinExamGrade==Grade, yes = "Upheld", no = "Redeemed")) %>%
   right_join(dummy.grades, by = c("Name", "Grade", "TotalPerc", "FinExamPerc", "FinExamGrade", "TA")) %>%
   mutate(Redemption = ifelse(is.na(Redemption.x), yes = Redemption.y, no = Redemption.x)) %>%
   mutate(NewCourseGrade=ifelse(test = Redemption=="Redeemed", yes = FinExamGrade, no = Grade)) %>%
   select(Name, TotalPerc, NewCourseGrade, CurrentGrade = Grade, Redemption, FinExamPerc, FinExamGrade, TA) %>%
   arrange(Redemption, desc(TotalPerc), Name) %>%
   filter(!is.na(TA))
+
+#write_csv(final.grades, "R/final-grades.csv")
+
 

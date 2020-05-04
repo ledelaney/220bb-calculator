@@ -7,7 +7,7 @@ setwd("/Users/lucydelaney/220bb-calculator/")
 
 
 ### IMPORT GRADE FILE ###
-blackboard.raw <- read_csv("R/all-class-grades-prefinal.csv", col_names = T, na = c("", " ", "NA"), 
+blackboard.raw <- read_csv("R/all-class-grades-postfinal.csv", col_names = T, na = c("", " ", "NA"), 
          trim_ws = T, skip_empty_rows = T, n_max = 16) 
 
 
@@ -65,7 +65,9 @@ edit.raw.grades <- function(mydata = blackboard.raw){
     select(Exam.1 = "Exam 1 [Total Pts: 100 Score] |1720428", 
            Exam.2 = "EXAM 2 [Total Pts: 100 Score] |1802569", 
            Final.A = "Final Exam Part A [Total Pts: 100 Score] |1808678", 
-           Final.B = "BIOS220 FINAL Part B [Total Pts: 100 Score] |1807167")
+           Final.B = "BIOS220 FINAL Part B [Total Pts: 100 Score] |1807167") %>%
+    rowwise() %>%
+    mutate(Exam.total = sum(Exam.1, Exam.2, na.rm = T), FinExam.Total = sum(Final.A, Final.B, na.rm = T))
   
   ## Select and rename iClicker scores
   iClick <- mydata %>%
@@ -96,7 +98,7 @@ make.grades <- function(prunedgrades = prune.grades){
   ## Edit here the class totals so far
     #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker
     #Right now, 10 quizzes, 2 exams, 7HWs, and 25 iClick (bonus is bonus)
-  total.so.far <- (10 * 10) + (2 * 100) + (7*10) + 25
+  total.so.far <- (10 * 10) + (4 * 100) + (7*10) + 25
   
   ## List of students' names and TA
   name <- prunedgrades %>%
@@ -111,7 +113,7 @@ make.grades <- function(prunedgrades = prune.grades){
   ## Add back to full df and fix total course points so you may divide
   ## and calculate percentage for each student
   fix.for.calculations <- prunedgrades %>%
-    select(name, ta, Quiz.total, HW.totals, Exam.1:bonus) %>%
+    select(name, ta, Quiz.total, HW.totals, Exam.total:bonus) %>%
     mutate(total.points = total.so.far) %>%
     left_join(exam.exemptions, by = c("name", "ta")) %>%
     mutate(totalpts = case_when(!is.na(total.points.y) ~ total.points.y, is.na(total.points.y) ~ total.points.x)) %>%
