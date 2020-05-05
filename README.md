@@ -11,6 +11,7 @@
 + Subtracts 25pts from the full point totals of students that were exempted from second half iClickers, OR exempts them automatically for a score less than 11pts.
 + Uses the full point totals and summed values to calculate a course percentage.
 + Assigns a letter grade based on syllabus cutoffs.
++ Checks final exam grade for redemption.
 + Generates a CSV file sorted by TA with grade columns appearing first and raw data afterwards.
 
 ### Graphics functions
