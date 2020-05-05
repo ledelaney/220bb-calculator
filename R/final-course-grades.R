@@ -103,6 +103,9 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
   name <- prunedgrades %>%
     select(name, ta)
   
+  ## Remove low second half iClicker scores from calculations (automatic exemption)
+  prunedgrades$iC.2[prunedgrades$iC.2<11] <- NA
+  
   ## Remove points from the total for exam or iClicker exemptions
   fix.for.calculations <- prunedgrades %>%
     mutate(total.points = total.so.far) %>%
@@ -111,9 +114,6 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
     select(name, ta, Quiz.total, HW.totals, Exam.total:bonus, pts.plus.examexemp) %>%
     mutate(totalpts = case_when(is.na(iC.2) ~ pts.plus.examexemp - 25, !is.na(iC.2) ~ pts.plus.examexemp)) %>%
     select(-pts.plus.examexemp)
-  
-  ## Remove low second half iClicker scores from calculations (automatic exemption)
-  fix.for.calculations$iC.2[fix.for.calculations$iC.2<11] <- NA
   
   ## Use percentage to assign letter grades
   adding.data <- fix.for.calculations %>%
