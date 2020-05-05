@@ -92,12 +92,11 @@ prune.grades <- edit.raw.grades()
 
 
 ### MAKE GRADES ###
-
 make.prelim.grades <- function(prunedgrades = prune.grades){
   
-  ## Edit here the class totals so far
-  #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker, 200pts final exam
-  #Right now, 10 quizzes, 2 exams + final, 7HWs, and 50 iClick (bonus is bonus)
+  ## Edit here the class totals so far:
+    #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker, 200pts final exam
+    #Right now, 10 quizzes, 2 exams + final, 7HWs, and 50 iClick (bonus is bonus)
   total.so.far <- (10 * 10) + (2 * 200) + (7*10) + 50
   
   ## List of students' names and TA
@@ -113,7 +112,7 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
     mutate(totalpts = case_when(is.na(iC.2) ~ pts.plus.examexemp - 25, !is.na(iC.2) ~ pts.plus.examexemp)) %>%
     select(-pts.plus.examexemp)
   
-  ## Remove low second half iClicker scores from calculations
+  ## Remove low second half iClicker scores from calculations (automatic exemption)
   fix.for.calculations$iC.2[fix.for.calculations$iC.2<11] <- NA
   
   ## Use percentage to assign letter grades
@@ -141,8 +140,8 @@ grade.summary <- make.prelim.grades() %>%
 my.grades <- grade.summary %>%
   left_join(prune.grades)
 
-
 ## Function to determine whether or not a student is redeemed by their final grade
+## and summarizes all results
 determine.redemption <- function(mydata = my.grades){
   assign.grades <- my.grades %>%
     select(name:grade, FinExam.Total) %>%
@@ -161,8 +160,7 @@ determine.redemption <- function(mydata = my.grades){
   
   ## If final exam percentage is higher than course grade percentage, and the grade is not the same,
   ## give final exam grade -- "Redeemed"
-  #df for use with RMD file "grade-totals"
-  final.grades <- assign.grades %>% # here change to assign.grades
+  final.grades <- assign.grades %>% 
     filter(Redemption == "Redeemed?") %>%
     mutate(Redemption = ifelse(FinExamGrade==Grade, yes = "Upheld", no = "Redeemed")) %>%
     right_join(assign.grades, by = c("Name", "Grade", "TotalPerc", "FinExamPerc", "FinExamGrade", "TA")) %>%
@@ -186,6 +184,6 @@ final.spreadsheet <- final.grade.summary %>%
   select(Name:FinalGrade, Redemption, Percent = perc, TotalPts = total, FinExamGrade,
          OriginalGrade = grade, Quiz.1:bonus)
 
-
-write_csv(final.grade.summary, "R/grade-summary.csv")
-write_csv(final.spreadsheet, "R/gradebook.csv")
+## Write files for distribution
+#write_csv(final.grade.summary, "R/grade-summary.csv")
+#write_csv(final.spreadsheet, "R/gradebook.csv")
