@@ -96,8 +96,8 @@ prune.grades <- edit.raw.grades()
 make.prelim.grades <- function(prunedgrades = prune.grades){
   
   ## Edit here the class totals so far
-    #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker, 200pts final exam
-    #Right now, 10 quizzes, 2 exams + final, 7HWs, and 50 iClick (bonus is bonus)
+  #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker, 200pts final exam
+  #Right now, 10 quizzes, 2 exams + final, 7HWs, and 50 iClick (bonus is bonus)
   total.so.far <- (10 * 10) + (2 * 200) + (7*10) + 50
   
   ## List of students' names and TA
@@ -108,10 +108,13 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
   fix.for.calculations <- prunedgrades %>%
     mutate(total.points = total.so.far) %>%
     mutate(pts.plus.examexemp = case_when((is.na(Exam.1) | is.na(Exam.2)) ~ total.points - 100, 
-                                     (!is.na(Exam.1) & !is.na(Exam.2)) ~ total.points)) %>%
+                                          (!is.na(Exam.1) & !is.na(Exam.2)) ~ total.points)) %>%
     select(name, ta, Quiz.total, HW.totals, Exam.total:bonus, pts.plus.examexemp) %>%
     mutate(totalpts = case_when(is.na(iC.2) ~ pts.plus.examexemp - 25, !is.na(iC.2) ~ pts.plus.examexemp)) %>%
     select(-pts.plus.examexemp)
+  
+  ## Remove low second half iClicker scores from calculations
+  fix.for.calculations$iC.2[fix.for.calculations$iC.2<11] <- NA
   
   ## Use percentage to assign letter grades
   adding.data <- fix.for.calculations %>%
@@ -130,12 +133,14 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
 
 ## Summary df of calculated grades
 grade.summary <- make.prelim.grades() %>%
-  select(name, ta, total:grade)
+  select(name, ta, total:grade) %>%
+  filter(total != 0) %>%
+  filter(!is.na(ta))
 
 ## Add raw data and summary data for complete gradesheet pre-final
 my.grades <- grade.summary %>%
   left_join(prune.grades)
-  
+
 
 ## Function to determine whether or not a student is redeemed by their final grade
 determine.redemption <- function(mydata = my.grades){
@@ -176,13 +181,11 @@ final.grade.summary <- determine.redemption()
 
 ## Add to complete gradebook for finalized speadsheet with all data
 final.spreadsheet <- final.grade.summary %>%
-    select(Name, TA, FinalGrade = NewCourseGrade, Redemption, FinExamGrade) %>%
-    right_join(my.grades, by = c("Name" = "name", "TA" = "ta")) %>%
-    select(Name:FinalGrade, Percent = perc, TotalPts = total, Redemption, FinExamGrade,
-           OriginalGrade = grade, Quiz.1:bonus)
-  
-
-write_csv(final.grade.summary, "R/final-grade-summary.csv")
-write_csv(final.spreadsheet, "R/final-gradebook.csv")
+  select(Name, TA, FinalGrade = NewCourseGrade, Redemption, FinExamGrade) %>%
+  right_join(my.grades, by = c("Name" = "name", "TA" = "ta")) %>%
+  select(Name:FinalGrade, Redemption, Percent = perc, TotalPts = total, FinExamGrade,
+         OriginalGrade = grade, Quiz.1:bonus)
 
 
+write_csv(final.grade.summary, "R/grade-summary.csv")
+write_csv(final.spreadsheet, "R/gradebook.csv")

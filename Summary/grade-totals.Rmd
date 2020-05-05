@@ -21,7 +21,7 @@ source("R/final-course-grades.R")
 ```{r, eval=TRUE, warning = FALSE}
 
 ## Make a color-labeled grade table
-final.grades %>%
+final.grade.summary %>%
    mutate(TotalPerc = case_when(TotalPerc < 50.5 ~ cell_spec(TotalPerc, color = "white", 
                                                              background = viridis(n = 1, begin = 0, end = 0.2)), 
                             (50.5 <= TotalPerc & TotalPerc < 59.5) ~ cell_spec(TotalPerc, 
@@ -51,4 +51,16 @@ final.grades %>%
   kable_styling(c("striped", "condensed"), full_width = F, fixed_thead = T) 
 
 
+```
+
+```{r, eval=T, warning = FALSE}
+
+colors <- c(viridis(n = 1, begin = 0.8, end = 1), viridis(n = 1, begin = 0.6, end = 0.8), viridis(n = 1, begin = 0.4, end = 0.6)) #viridis(n = 1, begin = 0.2, end = 0.4), viridis(n = 1, begin = 0, end = 0.2))
+
+ggplot(final.grade.summary, aes(x = NewCourseGrade)) +
+  geom_histogram(stat = "count", fill = colors) +
+  theme_classic() +
+  ggtitle("Spring BIOS220: Distribution of Letter Grades")
+
+  
 ```
