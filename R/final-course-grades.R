@@ -185,5 +185,5 @@ final.spreadsheet <- final.grade.summary %>%
          OriginalGrade = grade, Quiz.1:bonus)
 
 ## Write files for distribution
-#write_csv(final.grade.summary, "R/grade-summary.csv")
-#write_csv(final.spreadsheet, "R/gradebook.csv")
+#write_csv(final.grade.summary, "Summary/grade-summary.csv")
+#write_csv(final.spreadsheet, "Summary/gradebook.csv")
