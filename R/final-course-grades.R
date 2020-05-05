@@ -19,8 +19,8 @@ edit.raw.grades <- function(mydata = blackboard.raw){
   
   ## Get a group of students' names and TAs
   names <- mydata %>%
-    select(last = "Last Name", first = "First Name", 
-           ta = "TA Name [Total Pts: 100 Text] |1720399") %>%
+    select(last = contains("Last Name"), first = contains("First Name"), 
+           ta = contains("TA Name")) %>%
     mutate(name = paste0(last, "_", first)) %>%
     select(name, ta)
   
@@ -63,21 +63,21 @@ edit.raw.grades <- function(mydata = blackboard.raw){
   
   ## Select and rename exams
   exams <- mydata %>%
-    select(Exam.1 = "Exam 1 [Total Pts: 100 Score] |1720428", 
-           Exam.2 = "EXAM 2 [Total Pts: 100 Score] |1802569", 
-           Final.A = "Final Exam Part A [Total Pts: 100 Score] |1808678", 
-           Final.B = "BIOS220 FINAL Part B [Total Pts: 100 Score] |1807167") %>%
+    select(Exam.1 = contains("Exam 1"), 
+           Exam.2 = contains("EXAM 2"), 
+           Final.A = contains("Final Exam Part A"), 
+           Final.B = contains("FINAL Part B")) %>%
     rowwise() %>%
     mutate(Exam.total = sum(Exam.1, Exam.2, na.rm = T), FinExam.Total = sum(Final.A, Final.B, na.rm = T))
   
   ## Select and rename iClicker scores
   iClick <- mydata %>%
-    select(iC.1 = "iClicker: First Half [Total Pts: 25 Score] |1742843", 
-           iC.2 = "iClicker: Second Half [Total Pts: 25 Score] |1742844")
+    select(iC.1 = contains("iClicker: First Half"), 
+           iC.2 = contains("iClicker: Second Half"))
   
   ## Grab bonus columns
   bonus <- mydata %>%
-    select(bonus = "Bonus Evals First Half [Total Pts: 0 Score] |1758308")
+    select(bonus = contains("Bonus Evals"))
   
   ## Combine all columns for final grade calculations
   final <- bind_cols(names, Quiz.total, new.hw, exams, iClick, bonus) %>%
@@ -87,40 +87,31 @@ edit.raw.grades <- function(mydata = blackboard.raw){
   
 }
 
-## Get a df of all data used to calculate final grades
+## Get a tidy df of all data used to calculate final grades
 prune.grades <- edit.raw.grades() 
 
 
 ### MAKE GRADES ###
 
-## Will have to deal with iClicker exemptions for the second half of the course
-  #use mutate(iCl.2 = case_when(is.na(iCl.2) ~ 25, !is.na(iCl.2) ~ iCl.2)
-
-make.grades <- function(prunedgrades = prune.grades){
+make.prelim.grades <- function(prunedgrades = prune.grades){
   
   ## Edit here the class totals so far
-    #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker
-    #Right now, 10 quizzes, 2 exams, 7HWs, and 25 iClick (bonus is bonus)
-  total.so.far <- (10 * 10) + (2 * 200) + (7*10) + 25
+    #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker, 200pts final exam
+    #Right now, 10 quizzes, 2 exams + final, 7HWs, and 50 iClick (bonus is bonus)
+  total.so.far <- (10 * 10) + (2 * 200) + (7*10) + 50
   
   ## List of students' names and TA
   name <- prunedgrades %>%
     select(name, ta)
   
-  ## Pull out students that were exempted for one of the exams
-  exam.exemptions <- prunedgrades %>%
-    filter(is.na(Exam.1) | is.na(Exam.2)) %>%
-    mutate(total.points = total.so.far - 100) %>%
-    select(name, ta, total.points)
-  
-  ## Add back to full df and fix total course points so you may divide
-  ## and calculate percentage for each student
+  ## Remove points from the total for exam or iClicker exemptions
   fix.for.calculations <- prunedgrades %>%
-    select(name, ta, Quiz.total, HW.totals, Exam.total:bonus) %>%
     mutate(total.points = total.so.far) %>%
-    left_join(exam.exemptions, by = c("name", "ta")) %>%
-    mutate(totalpts = case_when(!is.na(total.points.y) ~ total.points.y, is.na(total.points.y) ~ total.points.x)) %>%
-    select(name, ta, Quiz.total:bonus, totalpts) 
+    mutate(pts.plus.examexemp = case_when((is.na(Exam.1) | is.na(Exam.2)) ~ total.points - 100, 
+                                     (!is.na(Exam.1) & !is.na(Exam.2)) ~ total.points)) %>%
+    select(name, ta, Quiz.total, HW.totals, Exam.total:bonus, pts.plus.examexemp) %>%
+    mutate(totalpts = case_when(is.na(iC.2) ~ pts.plus.examexemp - 25, !is.na(iC.2) ~ pts.plus.examexemp)) %>%
+    select(-pts.plus.examexemp)
   
   ## Use percentage to assign letter grades
   adding.data <- fix.for.calculations %>%
@@ -138,50 +129,60 @@ make.grades <- function(prunedgrades = prune.grades){
 }
 
 ## Summary df of calculated grades
-grade.summary <- make.grades() %>%
+grade.summary <- make.prelim.grades() %>%
   select(name, ta, total:grade)
 
-## Add raw data and summary data for complete gradesheet
+## Add raw data and summary data for complete gradesheet pre-final
 my.grades <- grade.summary %>%
   left_join(prune.grades)
   
 
-## Download a csv sorted by TA of all relevant grading columns
-write_csv(x = my.grades, path = "R/my-gradesheet.csv")
-
-## Add a fake final exam score to test dummy table, fix names, 
-## assign final exam letter grades
-#dummy.grades <- grade.summary %>%
-#  add_column(runif(n = length(grade.summary$total), min = 40, max = 85)) %>%
-
-assign.grades <- my.grades %>%
-  select(name:grade, FinExam.Total) %>%
-  mutate(FinExamPerc = (FinExam.Total/200)*100) %>%
-  select(-FinExam.Total) %>%
-  setNames(., c("Name", "TA", "TotalPts", "TotalPerc", "Grade", "FinExamPerc")) %>%
-  mutate(FinExamGrade = case_when(FinExamPerc < 50.5 ~ "F", 
-                                  (50.5 <= FinExamPerc & FinExamPerc < 59.5) ~ "D", 
-                                  (59.5 <= FinExamPerc & FinExamPerc < 74.5) ~ "C", 
-                                  (74.5 <= FinExamPerc & FinExamPerc < 84.5) ~ "B",
-                                  (84.5 <= FinExamPerc & FinExamPerc <= 100) ~ "A")) %>%
-  mutate(Redemption = ifelse(FinExamPerc > TotalPerc, yes = "Redeemed?", no = "Upheld")) %>%
-  mutate(Name, Grade, TotalPerc = round(TotalPerc, 2), Redemption, FinExamPerc = round(FinExamPerc, 2), 
-         FinExamGrade, TA) %>%
-  select(-TotalPts)
+## Function to determine whether or not a student is redeemed by their final grade
+determine.redemption <- function(mydata = my.grades){
+  assign.grades <- my.grades %>%
+    select(name:grade, FinExam.Total) %>%
+    mutate(FinExamPerc = (FinExam.Total/200)*100) %>%
+    select(-FinExam.Total) %>%
+    setNames(., c("Name", "TA", "TotalPts", "TotalPerc", "Grade", "FinExamPerc")) %>%
+    mutate(FinExamGrade = case_when(FinExamPerc < 50.5 ~ "F", 
+                                    (50.5 <= FinExamPerc & FinExamPerc < 59.5) ~ "D", 
+                                    (59.5 <= FinExamPerc & FinExamPerc < 74.5) ~ "C", 
+                                    (74.5 <= FinExamPerc & FinExamPerc < 84.5) ~ "B",
+                                    (84.5 <= FinExamPerc & FinExamPerc <= 100) ~ "A")) %>%
+    mutate(Redemption = ifelse(FinExamPerc > TotalPerc, yes = "Redeemed?", no = "Upheld")) %>%
+    mutate(Name, Grade, TotalPerc = round(TotalPerc, 2), Redemption, FinExamPerc = round(FinExamPerc, 2), 
+           FinExamGrade, TA) %>%
+    select(-TotalPts)
   
-## If final exam percentage is higher than course grade percentage, and the grade is not the same,
-## give final exam grade -- "Redeemed"
+  ## If final exam percentage is higher than course grade percentage, and the grade is not the same,
+  ## give final exam grade -- "Redeemed"
   #df for use with RMD file "grade-totals"
-final.grades <- assign.grades %>% # here change to assign.grades
-  filter(Redemption == "Redeemed?") %>%
-  mutate(Redemption = ifelse(FinExamGrade==Grade, yes = "Upheld", no = "Redeemed")) %>%
-  right_join(assign.grades, by = c("Name", "Grade", "TotalPerc", "FinExamPerc", "FinExamGrade", "TA")) %>%
-  mutate(Redemption = ifelse(is.na(Redemption.x), yes = Redemption.y, no = Redemption.x)) %>%
-  mutate(NewCourseGrade=ifelse(test = Redemption=="Redeemed", yes = FinExamGrade, no = Grade)) %>%
-  select(Name, TotalPerc, NewCourseGrade, CurrentGrade = Grade, Redemption, FinExamPerc, FinExamGrade, TA) %>%
-  arrange(Redemption, desc(TotalPerc), Name) %>%
-  filter(!is.na(TA))
+  final.grades <- assign.grades %>% # here change to assign.grades
+    filter(Redemption == "Redeemed?") %>%
+    mutate(Redemption = ifelse(FinExamGrade==Grade, yes = "Upheld", no = "Redeemed")) %>%
+    right_join(assign.grades, by = c("Name", "Grade", "TotalPerc", "FinExamPerc", "FinExamGrade", "TA")) %>%
+    mutate(Redemption = ifelse(is.na(Redemption.x), yes = Redemption.y, no = Redemption.x)) %>%
+    mutate(NewCourseGrade=ifelse(test = Redemption=="Redeemed", yes = FinExamGrade, no = Grade)) %>%
+    select(Name, TotalPerc, NewCourseGrade, CurrentGrade = Grade, Redemption, FinExamPerc, FinExamGrade, TA) %>%
+    arrange(Redemption, desc(TotalPerc), Name) %>%
+    filter(!is.na(TA))
+  
+  return(final.grades)
+  
+}
 
-write_csv(final.grades, "R/final-grades.csv")
+## Summary df of grades post-final, including redemption
+final.grade.summary <- determine.redemption()
+
+## Add to complete gradebook for finalized speadsheet with all data
+final.spreadsheet <- final.grade.summary %>%
+    select(Name, TA, FinalGrade = NewCourseGrade, Redemption, FinExamGrade) %>%
+    right_join(my.grades, by = c("Name" = "name", "TA" = "ta")) %>%
+    select(Name:FinalGrade, Percent = perc, TotalPts = total, Redemption, FinExamGrade,
+           OriginalGrade = grade, Quiz.1:bonus)
+  
+
+write_csv(final.grade.summary, "R/final-grade-summary.csv")
+write_csv(final.spreadsheet, "R/final-gradebook.csv")
 
 

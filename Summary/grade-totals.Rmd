@@ -48,6 +48,7 @@ final.grades %>%
                   cell_spec(Redemption, color = "red", bold = T),
                   cell_spec(Redemption, italic = T))) %>%
   kable(escape = F, align = "c") %>%
-  kable_styling(c("striped", "condensed"), full_width = F) 
+  kable_styling(c("striped", "condensed"), full_width = F, fixed_thead = T) 
+
 
 ```
