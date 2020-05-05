@@ -8,6 +8,7 @@
 + Replaces NA exempted HW grades with the students’ average HW grade, and subtracts the lowest HW grade to include the best 10 only.
 + Sums up all  HWs for a HW.totals.
 + Subtracts 100pts from the full point totals of students that were exempted from an exam.
++ Subtracts 25pts from the full point totals of students that were exempted from second half iClickers, OR exempts them automatically for a score less than 11pts.
 + Uses the full point totals and summed values to calculate a course percentage.
 + Assigns a letter grade based on syllabus cutoffs.
 + Generates a CSV file sorted by TA with grade columns appearing first and raw data afterwards.
