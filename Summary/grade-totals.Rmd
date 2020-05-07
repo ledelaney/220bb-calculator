@@ -9,8 +9,6 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = F)
 
-setwd("/Users/lucydelaney/220bb-calculator/")
-
 ## Import relevant data
 source("R/final-course-grades.R")
 

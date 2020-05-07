@@ -5,10 +5,6 @@ library(formattable)
 library(tidyverse)
 library(viridisLite)
 
-## Set directory
-setwd("/Users/lucydelaney/220bb-calculator/")
-
-
 ### IMPORT GRADE FILE ###
 blackboard.raw <- read_csv("R/input/all-class-grades-postfinal.csv", col_names = T, na = c("", " ", "NA"), 
                    trim_ws = T, skip_empty_rows = T, n_max = 16) 
