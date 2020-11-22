@@ -10,7 +10,7 @@ blackboard.raw <- read_csv("R/input/all-class-grades-postfinal.csv", col_names =
                    trim_ws = T, skip_empty_rows = T, n_max = 16) 
 
 
-### PRUNE UGLY GRADE FILE ###
+### PRUNE UGLY Bb GRADE FILE ###
 edit.raw.grades <- function(mydata = blackboard.raw){
   
   ## Get a group of students' names and TAs
@@ -20,7 +20,7 @@ edit.raw.grades <- function(mydata = blackboard.raw){
     mutate(name = paste0(last, "_", first)) %>%
     select(name, ta)
   
-  ## Rename quiz rows, replace NA with average
+  ## Rename quiz rows, replace NA values with average quiz grade
   quiz <- mydata %>%
     select(contains("quiz")) %>%
     select(1:10) %>%
@@ -36,7 +36,7 @@ edit.raw.grades <- function(mydata = blackboard.raw){
     setNames(., "Quiz.total") %>%
     bind_cols(quiz, .)
   
-  ## Rename HW rows, replace NA with average
+  ## Rename HW rows, replace NA HW scores with average HW score
   hw <- mydata %>%
     select(contains("HW")) %>%
     setNames(., c("HW.1", "HW.2", "HW.3", "HW.4", "HW.5", 
@@ -46,11 +46,9 @@ edit.raw.grades <- function(mydata = blackboard.raw){
     mutate_at(vars(starts_with("HW")), funs(replace(., is.na(.), avg))) %>%
     select(-avg) 
   
-  ## Choose the 10 best homeworks
-  HW.sums <- tibble(rowSums(hw)) %>%
-    setNames(., "HW.sum") 
-  HW.min <- tibble(apply(hw, 1, FUN = min)) %>%
-    setNames(., "HW.min")
+  ## Choose the 10 best homeworks (i.e., drop lowest)
+  HW.sums <- enframe(rowSums(hw), name = NULL, value = "HW.sum") 
+  HW.min <- enframe(apply(hw, 1, FUN = min), name = NULL, value = "HW.min") 
   
   ## Sum all homework values
   new.hw <- bind_cols(hw, HW.sums, HW.min) %>%
@@ -64,7 +62,8 @@ edit.raw.grades <- function(mydata = blackboard.raw){
            Final.A = contains("Final Exam Part A"), 
            Final.B = contains("FINAL Part B")) %>%
     rowwise() %>%
-    mutate(Exam.total = sum(Exam.1, Exam.2, na.rm = T), FinExam.Total = sum(Final.A, Final.B, na.rm = T))
+    mutate(Exam.total = sum(Exam.1, Exam.2, na.rm = T), 
+           FinExam.Total = sum(Final.A, Final.B, na.rm = T))
   
   ## Select and rename iClicker scores
   iClick <- mydata %>%
@@ -92,7 +91,7 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
   
   ## Edit here the class totals so far:
     #10 points per quiz, 100 points per exam, 7 points per HW, 25pts iClicker, 200pts final exam
-    #Right now, 10 quizzes, 2 exams + final, 7HWs, and 50 iClick (bonus is bonus)
+    #Right now, 10 quizzes, 2 exams + final, 7HWs, and 50 iClick (bonus is bonus, duh)
   total.so.far <- (10 * 10) + (2 * 200) + (7*10) + 50
   
   ## List of students' names and TA
@@ -100,7 +99,7 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
     select(name, ta)
   
   ## Remove low second half iClicker scores from calculations (automatic exemption)
-  prunedgrades$iC.2[prunedgrades$iC.2<11] <- NA
+  prunedgrades$iC.2[prunedgrades$iC.2<11] <- NaN
   
   ## Remove points from the total for exam or iClicker exemptions
   fix.for.calculations <- prunedgrades %>%
@@ -108,7 +107,8 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
     mutate(pts.plus.examexemp = case_when((is.na(Exam.1) | is.na(Exam.2)) ~ total.points - 100, 
                                           (!is.na(Exam.1) & !is.na(Exam.2)) ~ total.points)) %>%
     select(name, ta, Quiz.total, HW.totals, Exam.total:bonus, pts.plus.examexemp) %>%
-    mutate(totalpts = case_when(is.na(iC.2) ~ pts.plus.examexemp - 25, !is.na(iC.2) ~ pts.plus.examexemp)) %>%
+    mutate(totalpts = case_when(is.na(iC.2) ~ pts.plus.examexemp - 25, 
+                                !is.na(iC.2) ~ pts.plus.examexemp)) %>%
     select(-pts.plus.examexemp)
   
   ## Use percentage to assign letter grades
@@ -118,8 +118,10 @@ make.prelim.grades <- function(prunedgrades = prune.grades){
     left_join(fix.for.calculations) %>%
     mutate(perc = (total/totalpts)*100) %>%
     select(name, ta, total, perc) %>%
-    mutate(grade = case_when(perc < 50.5 ~ "F", (50.5 <= perc & perc < 59.5) ~ "D", 
-                             (59.5 <= perc & perc < 74.5) ~ "C", (74.5 <= perc & perc < 84.5) ~ "B", 
+    mutate(grade = case_when(perc < 50.5 ~ "F", 
+                             (50.5 <= perc & perc < 59.5) ~ "D", 
+                             (59.5 <= perc & perc < 74.5) ~ "C", 
+                             (74.5 <= perc & perc < 84.5) ~ "B", 
                              (84.5 <= perc & perc <= 100) ~ "A"))
   
   return(adding.data)
@@ -158,11 +160,19 @@ determine.redemption <- function(mydata = my.grades){
   ## give final exam grade -- "Redeemed"
   final.grades <- assign.grades %>% 
     filter(Redemption == "Redeemed?") %>%
-    mutate(Redemption = ifelse(FinExamGrade==Grade, yes = "Upheld", no = "Redeemed")) %>%
-    right_join(assign.grades, by = c("Name", "Grade", "TotalPerc", "FinExamPerc", "FinExamGrade", "TA")) %>%
-    mutate(Redemption = ifelse(is.na(Redemption.x), yes = Redemption.y, no = Redemption.x)) %>%
-    mutate(NewCourseGrade=ifelse(test = Redemption=="Redeemed", yes = FinExamGrade, no = Grade)) %>%
-    select(Name, TotalPerc, NewCourseGrade, CurrentGrade = Grade, Redemption, FinExamPerc, FinExamGrade, TA) %>%
+    mutate(Redemption = ifelse(FinExamGrade==Grade, 
+                               yes = "Upheld", 
+                               no = "Redeemed")) %>%
+    right_join(assign.grades, 
+               by = c("Name", "Grade", "TotalPerc", "FinExamPerc", "FinExamGrade", "TA")) %>%
+    mutate(Redemption = ifelse(is.na(Redemption.x), 
+                               yes = Redemption.y, 
+                               no = Redemption.x)) %>%
+    mutate(NewCourseGrade=ifelse(test = Redemption=="Redeemed", 
+                                 yes = FinExamGrade, 
+                                 no = Grade)) %>%
+    select(Name, TotalPerc, NewCourseGrade, CurrentGrade = Grade, 
+           Redemption, FinExamPerc, FinExamGrade, TA) %>%
     arrange(Redemption, desc(TotalPerc), Name) %>%
     filter(!is.na(TA))
   
