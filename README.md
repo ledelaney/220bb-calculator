@@ -1,6 +1,6 @@
 ## Blackboard calculations
 
-See rendered example of final output here: https://ledelaney.github.io/files/grade-totals.html
+See rendered example of final output here: https://ledelaney.org/projects/whitepapers/grade-totals.html
 
 ### R code functions
 
